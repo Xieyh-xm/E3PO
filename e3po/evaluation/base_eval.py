@@ -190,7 +190,7 @@ class BaseEvaluation:
         if self.last_img_index == img_index:
             return
         self.last_img_index = img_index
-        ground_truth_img = osp.join(self.ground_truth_img_path, f"{img_index}.png")
+        ground_truth_img = osp.join(self.ground_truth_img_path, f"{img_index}.jpeg")
         if not self.save_ground_truth_flag or not os.path.exists(ground_truth_img):
             self.logger.debug(f'[evaluation] start cal fov_uv')
             fov_ypr = [float(fov_direction['yaw']), float(fov_direction['pitch']), 0]
@@ -200,7 +200,7 @@ class BaseEvaluation:
             fov_uv = None
 
         self.logger.debug(f'[evaluation] start get ground truth img')
-        ground_truth = self._get_ground_truth_img(img_index, fov_uv)
+        ground_truth = self._get_ground_truth_img(img_index, fov_uv)  # 当前帧的实际视窗image
         self.logger.debug(f'[evaluation] end get ground truth img')
 
         self.logger.debug(f'[evaluation] start push pre-downloaded frame')
@@ -225,7 +225,7 @@ class BaseEvaluation:
            Ground truth image.
 
         """
-        ground_truth_img = osp.join(self.ground_truth_img_path, f"{img_index}.png")
+        ground_truth_img = osp.join(self.ground_truth_img_path, f"{img_index}.jpeg")
         if not self.save_ground_truth_flag or not os.path.exists(ground_truth_img):
             self.logger.debug('[evaluation] start extract frame')
             server_img = self.extract_frame('ori', '', img_index)

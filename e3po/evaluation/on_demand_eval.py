@@ -65,7 +65,7 @@ class OnDemandEvaluation(BaseEvaluation):
         decision_location = self.opt['method_settings']['decision_location']
         assert decision_location in ['client', 'server'], "[error] decision_location wrong. It should be set to the value in ['client', 'server']"
         rtt = self.opt['network_trace']['rtt'] * 0.5 if decision_location == 'server' else self.opt['network_trace']['rtt']
-        bandwidth = self.opt['network_trace']['bandwidth']
+        bandwidth = self.opt['network_trace']['bandwidth']  # Mbps
 
         decision_path = osp.join(self.opt['project_path'], 'result', self.opt['test_group'], self.opt['video']['origin']['video_name'].split('.')[0],
                                  self.opt['method_name'], 'decision.json')
@@ -77,11 +77,11 @@ class OnDemandEvaluation(BaseEvaluation):
         last_chunk_size = -1
         for row in decision_record:
             chunk_idx = row['chunk_idx']
-            chunk_size = 0
+            chunk_size = 0  # bits
             for tile in row['decision_data'][1:]:
                 chunk_size += self.data.get_size(row['chunk_idx'], int(tile['tile_idx']), tile['tile_bitrate'])
-            download_delay = chunk_size / bandwidth / 1000
-            playable_ts = row['decision_data'][0]['pw_ts'] + download_delay + rtt + rendering_delay
+            download_delay = chunk_size / bandwidth / 1000  # ms
+            playable_ts = row['decision_data'][0]['pw_ts'] + download_delay + rtt + rendering_delay  # 客户端完成chunk下载的时间戳
             if chunk_idx != last_chunk_idx:     # new chunk
                 tmp_playable_record = []
                 for tile in row['decision_data'][1:]:
@@ -133,27 +133,30 @@ class OnDemandEvaluation(BaseEvaluation):
         if self.playable_record[chunk_idx]['tile_list'][0]['playable_ts'] > fov_ts:        # there should be content for current frame
             self.logger.info(
                 f"[evaluation] no content to play at {fov_ts}. chunk_idx: {chunk_idx}, playable_record_ts: {self.playable_record[chunk_idx]['ts']}")
-            if self.save_result_img_flag and os.path.exists(osp.join(self.result_img_path, f"{img_index - 1}.png")):
-                shutil.copyfile(osp.join(self.result_img_path, f"{img_index - 1}.png"),
-                                osp.join(self.result_img_path, f"{img_index}.png"))
+            if self.save_result_img_flag and os.path.exists(osp.join(self.result_img_path, f"{img_index - 1}.jpeg")):
+                shutil.copyfile(osp.join(self.result_img_path, f"{img_index - 1}.jpeg"),
+                                osp.join(self.result_img_path, f"{img_index}.jpeg"))
             if tmp_psnr_ssim_flag:
                 self.psnr.append(0)
                 self.ssim.append(0)
             self.out_percent.append(1)
             return [{'motion_timestamp': fov_ts, 'location': 'no_content', 'out_area_percent': 1, 'psnr': 0, 'ssim': 0}]
 
+        # 获取视窗包含的tile_index的list（fov_tile_list）
+        # 在视窗内进行50*50的采样，获取每个采样点所在的tile_index的list（fov_pixel_tile_list）
         fov_tile_list, fov_pixel_tile_list = self.projection.sphere_to_tile(fov_direction)
 
         server_tile_list, server_qp_list = self._get_server_data(fov_ts)
 
+        # np.setdiff1d函数：找到两个数组中元素的差异，返回在fov_tile_list但不在server_tile_list中的元素值
         if len(np.setdiff1d(fov_tile_list, server_tile_list)) == 0:
             location = 'in'
             self.out_percent.append(0)
         else:
-            fov_diff_tile = np.setdiff1d(fov_tile_list, server_tile_list)
+            fov_diff_tile = np.setdiff1d(fov_tile_list, server_tile_list)  # 在视窗内但是未下载的tile_index的list
             location = 'out'
             out_pixel_num = 0
-            fov_pixel_tile_list = np.array(fov_pixel_tile_list.reshape(1, -1)[0])
+            fov_pixel_tile_list = np.array(fov_pixel_tile_list.reshape(1, -1)[0])  # 将采样点所在的tile_index的信息list展开并排序
             fov_pixel_tile_list = np.sort(fov_pixel_tile_list)
             for j in fov_diff_tile:
                 out_pixel_num += len(np.where(fov_pixel_tile_list == j)[0])
@@ -240,7 +243,7 @@ class OnDemandEvaluation(BaseEvaluation):
         # Generate the required fov image from the concat image
         fov_result = self.generate_fov_img(concat_img, coor_x_arr, coor_y_arr, checkout_result)
 
-        fov_result_name = osp.join(self.result_img_path, f"{img_index}.png")
+        fov_result_name = osp.join(self.result_img_path, f"{img_index}.jpeg")
         self.logger.debug(f'[evaluation] end generate client_img')
 
         self.logger.debug(f'[evaluation] start save img')

@@ -64,13 +64,13 @@ class Freedom1Data(TranscodingData):
         self.chunk_idx = 0
 
     def process_video(self):
-        self._convert_ori_video()
-        self._generate_viewport()
-        self._generate_h264()
-        self._get_viewport_size()
+        self._convert_ori_video()  # 将源视频转换投影方式
+        self._generate_viewport()  # 进行视点预测，根据预测结果遍历所有qp生成不同qp的视窗内容（以帧为单位存为jpeg视频）
+        self._generate_h264()      # 将VAM帧转换为mp4视频并基于此视频提取H264帧
+        self._get_viewport_size()  # 获取每一帧对应的视窗的size，记录在video_size.json中；进行质量选择，记录在decision.json中
         self._del_intermediate_file(self.work_folder, ['converted'], ['.json'])
 
-    def _convert_ori_video(self):
+    def _convert_ori_video(self):  # 将源视频转换投影方式
         """Convert original video's projection format and qp value."""
         os.makedirs(self.work_folder, exist_ok=True)
         os.chdir(self.work_folder)
@@ -91,7 +91,7 @@ class Freedom1Data(TranscodingData):
         os.system(cmd)
         self.logger.info('[converting origin video] end')
 
-    def _generate_viewport(self):
+    def _generate_viewport(self):  # 进行视点预测，根据预测结果遍历所有qp生成不同qp的视窗内容（以帧为单位存为jpeg视频）
         """Generate VAM frame."""
         client_record = pre_processing_client_log(deepcopy(self.opt))
         client_ts_list = list(client_record.keys())
@@ -100,14 +100,14 @@ class Freedom1Data(TranscodingData):
         self.logger.info("[generate vam] start")
         input_video_path = osp.join(self.work_folder, f"{self.projection_mode}.mp4")
         quality_bar = tqdm(self.quality_list, leave=False)
-        for quality in quality_bar:
+        for quality in quality_bar:  # 遍历quality等级
             quality_bar.set_description(f"[generate vam] qp={quality}")
 
             output_vam_path = osp.join(self.work_folder, f"qp{quality}", 'vams')
             os.makedirs(output_vam_path, exist_ok=True)
 
             video = cv2.VideoCapture()
-            assert video.open(input_video_path), f"can't read video[{input_video_path}]"
+            assert video.open(input_video_path), f"can't read video[{input_video_path}]"  # 获取进行投影变换后的视频
             frame_num = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
 
             frame_bar = tqdm(range(frame_num), leave=False)
@@ -118,19 +118,19 @@ class Freedom1Data(TranscodingData):
                 if not ret:
                     break
 
-                frame_ts = base_ts + frame_idx * 1000.0 / self.video_fps
+                frame_ts = base_ts + frame_idx * 1000.0 / self.video_fps  # 该视频帧的时间戳
                 motion_idx = 0
-                for i, ts in enumerate(client_ts_list):
-                    if ts + self.rtt <= frame_ts - self.decision_delay:
+                for i, ts in enumerate(client_ts_list):  # ts：客户端的当前时间
+                    if ts + self.rtt <= frame_ts - self.decision_delay:  # ts + self.rtt：从客户端传输到服务器端后的当前时间
                         motion_idx = i
                     else:
                         break
 
-                scale = client_record[client_ts_list[motion_idx]]['scale']
+                scale = client_record[client_ts_list[motion_idx]]['scale']  # 获取最新的用户的头部运动轨迹的信息
                 yaw = client_record[client_ts_list[motion_idx]]['yaw']
                 pitch = client_record[client_ts_list[motion_idx]]['pitch']
 
-                src_height, src_width = frame.shape[:2]
+                src_height, src_width = frame.shape[:2]  # 获取转换投影方式后的视频的宽高
                 start_width = src_width * (self.scale_factors[scale] - self.crop_factor[0]) / 2
                 start_height = src_height * (self.scale_factors[scale] - self.crop_factor[1]) / 2
 
@@ -145,10 +145,10 @@ class Freedom1Data(TranscodingData):
                 y = np.outer(np.sin(v), np.sin(u))
                 z = np.outer(np.cos(v), np.ones(np.size(u)))
 
-                # rotation angles
+                # rotation angles  旋转角度
                 a, b, r = [yaw, pitch, 0]
 
-                # rotation matrix
+                # rotation matrix  旋转矩阵
                 rot_a = np.array([np.cos(a) * np.cos(b), np.cos(a) * np.sin(b) * np.sin(r) - np.sin(a) * np.cos(r),
                                   np.cos(a) * np.sin(b) * np.cos(r) + np.sin(a) * np.sin(r)])
                 rot_b = np.array([np.sin(a) * np.cos(b), np.sin(a) * np.sin(b) * np.sin(r) + np.cos(a) * np.cos(r),
@@ -172,13 +172,13 @@ class Freedom1Data(TranscodingData):
 
                 # remap the frame according to pitch and yaw
                 vam_frame = cv2.remap(frame, dstMap_u, dstMap_v, cv2.INTER_LINEAR)
-                cv2.imwrite(osp.join(output_vam_path, f"{frame_idx}.png"), vam_frame, [cv2.IMWRITE_JPEG_QUALITY, 100])
+                cv2.imwrite(osp.join(output_vam_path, f"{frame_idx}.jpeg"), vam_frame, [cv2.IMWRITE_JPEG_QUALITY, 100])
 
             frame_bar.close()
         quality_bar.close()
         self.logger.info("[generate vam] end")
 
-    def _generate_h264(self):
+    def _generate_h264(self):  # 将VAM帧转换为mp4视频并基于此视频提取H264帧
         """Convert VAM frames into videos and extract H264 frames from them."""
         self.logger.info("[generate h264] start")
 
@@ -194,7 +194,7 @@ class Freedom1Data(TranscodingData):
             cmd = f"{self.ffmpeg} " \
                   f"-r {self.video_fps} " \
                   f"-start_number 0 " \
-                  f"-i %d.png " \
+                  f"-i %d.jpeg " \
                   f"-threads {self.ffmpeg_thread} " \
                   f"-preset faster " \
                   f"-c:v libx264 " \
@@ -219,7 +219,7 @@ class Freedom1Data(TranscodingData):
         quality_bar.close()
         self.logger.info("[generate h264] end")
 
-    def _get_viewport_size(self):
+    def _get_viewport_size(self):  # 获取每一帧对应的视窗的size，记录在video_size.json中；进行质量选择，记录在decision.json中
         """Read the processed video file size and write it to video_size.json"""
         self.logger.info('[get vam size]')
 
@@ -232,30 +232,30 @@ class Freedom1Data(TranscodingData):
         tmp_chunk_idx = -1
         tmp_chunk = {'chunk_idx': tmp_chunk_idx, 'chunk_meta_data': []}
         tmp_decision = {'chunk_idx': tmp_chunk_idx, 'decision_data': []}
-        scale = client_record[client_ts_list[0]]['scale']
+        scale = client_record[client_ts_list[0]]['scale']  # 初始化头部运动轨迹信息（scale、yaw、pitch）
         yaw = client_record[client_ts_list[0]]['yaw']
         pitch = client_record[client_ts_list[0]]['pitch']
         frame_num = len(os.listdir(osp.join(self.work_folder, f"qp{self.quality_list[0]}", 'h264')))
         frame_bar = tqdm(range(self.pre_download_duration * self.video_fps, frame_num), leave=False)
-        for frame_idx in frame_bar:
+        for frame_idx in frame_bar:  # 从需要开始做质量决策的视频帧开始
             frame_bar.set_description(f"[get vam size] vam_idx={frame_idx}")
 
-            vam_ts = base_ts + frame_idx * 1000.0 / self.video_fps
+            vam_ts = base_ts + frame_idx * 1000.0 / self.video_fps  # 该视频帧的时间戳
             motion_idx = 0
-            for i, ts in enumerate(client_ts_list):
-                if ts + self.rtt <= vam_ts - self.decision_delay:
+            for i, ts in enumerate(client_ts_list):  # ts：客户端的当前时间
+                if ts + self.rtt <= vam_ts - self.decision_delay:  # ts + self.rtt：从客户端传输到服务器端后的当前时间
                     motion_idx = i
                 else:
                     break
 
-            scale_ = scale
+            scale_ = scale  # 保存上一步的头部运动轨迹信息
             yaw_ = yaw
             pitch_ = pitch
-            scale = client_record[client_ts_list[motion_idx]]['scale']
+            scale = client_record[client_ts_list[motion_idx]]['scale'] # 获取最新的头部运动轨迹信息
             yaw = client_record[client_ts_list[motion_idx]]['yaw']
             pitch = client_record[client_ts_list[motion_idx]]['pitch']
 
-            if scale != scale_ or yaw != yaw_ or pitch != pitch_:
+            if scale != scale_ or yaw != yaw_ or pitch != pitch_:  # 如果头部发生运动
                 if len(tmp_chunk['chunk_meta_data']) != 0:
                     tmp_chunk['chunk_meta_data'].insert(0, {'yaw': yaw_, 'pitch': pitch_, 'scale': scale_,
                                                             'motion_ts': client_ts_list[motion_idx - 1]})
@@ -268,13 +268,13 @@ class Freedom1Data(TranscodingData):
                     decision_result.append(deepcopy(tmp_decision))
                 tmp_decision = {'chunk_idx': tmp_chunk_idx, 'decision_data': []}
 
-            pw_ts = max(base_ts, vam_ts - self.decision_delay)
-            tmp_vam = {"vam_idx": frame_idx, "vam_size_list": []}
+            pw_ts = max(base_ts, vam_ts - self.decision_delay)  # 计算可以进行该视频帧的质量选择的时间戳（>pw_ts后，可以进行质量选择）
+            tmp_vam = {"vam_idx": frame_idx, "vam_size_list": []}  # 用以存储当前视频帧的视窗在不同质量下的size（字典）
             for quality in self.quality_list:
                 h264_file_path = osp.join(self.work_folder, f"qp{quality}", 'h264', f"{frame_idx + 1}.h264")
 
                 tmp_vam['vam_size_list'].append({'qp': quality, 'vam_size': os.path.getsize(h264_file_path)})
-            tmp_chunk['chunk_meta_data'].append(tmp_vam)
+            tmp_chunk['chunk_meta_data'].append(tmp_vam)  # 用以存储当前chunk中的每一视频帧的视窗在不同质量下的size（字典）
             tmp_decision['decision_data'].append({'pw_ts': pw_ts, 'vam_idx': frame_idx, 'qp': self.quality_list[0]})
         frame_bar.close()
 

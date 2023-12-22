@@ -14,3 +14,6 @@ opensource_git_commit.log
 *.json
 api/
 pre-commit
+e3po/source/video/
+e3po/source/motion_trace/
+e3po/result/

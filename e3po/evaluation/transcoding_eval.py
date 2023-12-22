@@ -119,8 +119,8 @@ class TranscodingEvaluation(BaseEvaluation):
         tmp_psnr_ssim_flag = (self.psnr_flag or self.ssim_flag) and (img_index - self.base_frame_idx) % self.psnr_ssim_frequency == 0
         if self.playable_record[img_index]['ts'] > fov_ts:
             self.logger.info(f"[evaluation] no content to play at {fov_ts}. img_index: {img_index}, playable_record_ts: {self.playable_record[img_index]['ts']}")
-            if self.save_result_img_flag and os.path.exists(osp.join(self.result_img_path, f"{img_index - 1}.png")):
-                shutil.copyfile(osp.join(self.result_img_path, f"{img_index - 1}.png"), osp.join(self.result_img_path, f"{img_index}.png"))
+            if self.save_result_img_flag and os.path.exists(osp.join(self.result_img_path, f"{img_index - 1}.jpeg")):
+                shutil.copyfile(osp.join(self.result_img_path, f"{img_index - 1}.jpeg"), osp.join(self.result_img_path, f"{img_index}.jpeg"))
             if tmp_psnr_ssim_flag:
                 self.psnr.append(0)
                 self.ssim.append(0)
@@ -192,7 +192,7 @@ class TranscodingEvaluation(BaseEvaluation):
 
         # Generate the required fov image from the concat image
         fov_result = self.generate_fov_img(client_img, coor_x_arr, coor_y_arr)
-        fov_result_name = osp.join(self.result_img_path, f"{img_index}.png")
+        fov_result_name = osp.join(self.result_img_path, f"{img_index}.jpeg")
         self.logger.debug(f'[evaluation] end generate client_img')
 
         self.logger.debug(f'[evaluation] start save img')
@@ -299,11 +299,11 @@ class TranscodingEvaluation(BaseEvaluation):
         """
         total_storage = 0
         # The storage cost of transcoding mode is temporally set as 0. To enable it, just uncomment it.
-        # for chunk_idx in range(len(self.data.video_size)):
-        #     chunk_data = self.data.video_size[chunk_idx]
-        #     vam_storge_data = chunk_data['chunk_meta_data'][1]['vam_size_list']
-        #     for qp_idx in range(len(vam_storge_data)):
-        #         total_storage += vam_storge_data[qp_idx]['vam_size']
+        for chunk_idx in range(len(self.data.video_size)):
+            chunk_data = self.data.video_size[chunk_idx]
+            vam_storge_data = chunk_data['chunk_meta_data'][1]['vam_size_list']
+            for qp_idx in range(len(vam_storge_data)):
+                total_storage += vam_storge_data[qp_idx]['vam_size']
 
         total_bandwidth = round(total_bandwidth / 1000 / 1000 / 1000, 6)   # GB
 

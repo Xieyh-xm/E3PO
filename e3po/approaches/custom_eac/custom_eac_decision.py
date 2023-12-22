@@ -100,7 +100,7 @@ class CustomEacDecision(OnDemandDecision):
         for tiles in tile_record:
             tmp_bitrate = []
             for _ in tiles:
-                tmp_bitrate.append(min(self.quality_list))
+                tmp_bitrate.append(29)
             bitrate_record.append(tmp_bitrate)
 
         return bitrate_record

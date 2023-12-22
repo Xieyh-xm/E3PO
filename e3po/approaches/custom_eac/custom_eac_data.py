@@ -83,13 +83,13 @@ class CustomEacData(OnDemandData):
             ret, frame = video.read()
             if not ret:
                 break
-            frame = tmp_projection.erp_to_eac(frame, self.opt['metric']['inter_mode'])
+            frame = tmp_projection.erp_to_eac(frame, self.opt['metric']['inter_mode'])  # 将该帧视频转换投影方式。源视频是erp投影方式，在该方法下选择使用eac映射，因此函数erp_to_eac()的作用即为进行映射方式
 
-            cv2.imwrite(osp.join(frame_path, f"{frame_idx}.png"), frame, [cv2.IMWRITE_JPEG_QUALITY, 100])
+            cv2.imwrite(osp.join(frame_path, f"{frame_idx}.jpeg"), frame, [cv2.IMWRITE_JPEG_QUALITY, 100])
 
             if self.opt['method_settings']['background']['background_flag']:
                 frame = cv2.resize(frame, (self.background_width, self.background_height))
-                cv2.imwrite(osp.join(background_frame_path, f"{frame_idx}.png"), frame, [cv2.IMWRITE_JPEG_QUALITY, 100])
+                cv2.imwrite(osp.join(background_frame_path, f"{frame_idx}.jpeg"), frame, [cv2.IMWRITE_JPEG_QUALITY, 100])
         frame_bar.close()
 
         quality_bar = tqdm(self.quality_list, leave=False)
@@ -99,7 +99,7 @@ class CustomEacData(OnDemandData):
             cmd = f"{self.ffmpeg} " \
                   f"-r {self.video_fps} " \
                   f"-start_number 0 " \
-                  f"-i {osp.join('.', 'frames', '%d.png')} " \
+                  f"-i {osp.join('.', 'frames', '%d.jpeg')} " \
                   f"-threads {self.ffmpeg_thread} " \
                   f"-preset faster " \
                   f"-c:v libx264 " \
@@ -115,7 +115,7 @@ class CustomEacData(OnDemandData):
             cmd = f"{self.ffmpeg} " \
                   f"-r {self.video_fps} " \
                   f"-start_number 0 " \
-                  f"-i {osp.join('.', 'background_frames', '%d.png')} " \
+                  f"-i {osp.join('.', 'background_frames', '%d.jpeg')} " \
                   f"-threads {self.ffmpeg_thread} " \
                   f"-preset faster " \
                   f"-c:v libx264 " \
